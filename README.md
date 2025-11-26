@@ -18,7 +18,7 @@ A simple Streamlit app template for you to modify!
     $ python api.py
     ```
 
-3. Run the app
+3. In another window, run the app
 
    ```
    $ streamlit run streamlit_app.py
