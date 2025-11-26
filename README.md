@@ -14,7 +14,9 @@ A simple Streamlit app template for you to modify!
 
 2. Run the test server (to be replaced by a Large Language Model)
 
-	$ python api.py
+    ```
+    $ python api.py
+    ```
 
 3. Run the app
 
