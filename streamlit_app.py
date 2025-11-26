@@ -107,8 +107,8 @@ if st.button("Generate Story Outline"):
             - Focus purely on plot beats and story flow.
             """
 
-with st.spinner("Generating outline..."):
-    result = call_llm(prompt)
+        with st.spinner("Generating outline..."):
+            result = call_llm(prompt)
 
-st.subheader("📘 Generated Story Outline")
-st.markdown(result)
+        st.subheader("📘 Generated Story Outline")
+        st.markdown(result)
