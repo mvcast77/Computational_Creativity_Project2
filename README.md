@@ -12,7 +12,11 @@ A simple Streamlit app template for you to modify!
    $ pip install -r requirements.txt
    ```
 
-2. Run the app
+2. Run the test server (to be replaced by a Large Language Model)
+
+	$ python api.py
+
+3. Run the app
 
    ```
    $ streamlit run streamlit_app.py

@@ -58,7 +58,12 @@ st.info(f"Using model: {model} (best free option for creative writing).")
 # -------------------------
 
 def call_llm(prompt):
-    print("THE FUNCTION THAT CALLS THE LLM GOES HERE!")
+    response = requests.get("http://0.0.0.0:8000/api/v1/methods/receive_result")
+    print("Received: ")
+    print(response.text)
+    data = response.json()
+    return data["new_text"]
+    # print("THE FUNCTION THAT CALLS THE LLM GOES HERE!")
 
 
 # -------------------------
@@ -73,7 +78,8 @@ if st.button("Generate Story Outline"):
     else:
         combined_text = story_idea + "\n\n" + file_text
 
-        prompt = f"""
+        prompt = f"""Does this work"""
+        """
             Create a clear, detailed, visual story outline based on the following material:
 
             {combined_text}
