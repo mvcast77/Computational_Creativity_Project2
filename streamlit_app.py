@@ -15,7 +15,7 @@ st.markdown(
     """
     <style>
     .stButton>button {
-        background-color: #1d4ed8 !important;
+        background-color: #B57170 !important;
         color: #ffffff !important;
         border-radius: 6px !important;
         padding: 6px 12px !important;
@@ -94,6 +94,9 @@ with right_col:
 
     # Generate button placed under the story text area (right column)
     generate_button = st.button("Generate Story Outline", use_container_width=True, key="generate_button")
+    # Add vertical spacer so the prompt area sits lower on the page
+    # This helps align the prompt button closer to the bottom of the outline box
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
     # Subheader and textbox for prompt to edit outline
     st.subheader("⚡ Spice up the outline!")
