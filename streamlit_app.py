@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 import requests
+from streamlit_sortables import sort_items
 from datetime import datetime
 
 # -------------------------
@@ -9,20 +10,53 @@ from datetime import datetime
 # -------------------------
 
 st.set_page_config(page_title="Story Outline Builder", page_icon="📝", layout="wide")
+
+# Button styling: make generate button blue and readable
+st.markdown(
+    """
+    <style>
+    .stButton>button {
+        background-color: #1d4ed8 !important;
+        color: #ffffff !important;
+        border-radius: 6px !important;
+        padding: 6px 12px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
 st.title("📝 Story Outline Builder")
 st.write("Generate and edit story outlines using an LLM (Claude or OpenAI).")
 
-st.subheader("1. Describe Your Story Idea in the Text Box Below or Upload it")
-story_idea = st.text_area(
-    "Enter the premise or partial story description:",
-    placeholder="Example: A young botanist discovers a glowing plant in the forest...",
-    height=120
-)
+# -----------------------------------------------------
+# TOP CONTROL BAR
+# -----------------------------------------------------
 
-uploaded_file = st.file_uploader(
-    "Upload a PDF, TXT, or DOCX file: ",
-    type=["pdf", "txt", "docx"]
-)
+top_col1, top_col2, top_col3 = st.columns([3, 2, 2])
+
+with top_col1:
+    uploaded_file = st.file_uploader(
+        "Upload PDF / TXT / DOCX",
+        type=["pdf", "txt", "docx"]
+    )
+
+with top_col2:
+    model = st.selectbox(
+        "Choose LLM Model",
+        ["local-test-server"],
+        index=0
+    )
+
+with top_col3:
+    # (button moved below the story text area)
+    st.write("")
+
+
+# -----------------------------------------------------
+# FILE PROCESSING
+# -----------------------------------------------------
 
 file_text = ""
 
@@ -43,7 +77,29 @@ if uploaded_file is not None:
         doc = docx.Document(uploaded_file)
         file_text = "\n".join([p.text for p in doc.paragraphs])
 
-    st.text_area("Extracted Document Text:", value=file_text, height=200)
+    # st.text_area("Extracted Document Text:", value=file_text, height=200)
+
+
+# -----------------------------------------------------
+# LAYOUT: OUTLINE LEFT, STORY RIGHT
+# -----------------------------------------------------
+left_col, right_col = st.columns([1.2, 1])
+
+with right_col:
+    st.subheader("✏️ Story Text / Premise")
+    story_idea = st.text_area(
+        "Enter story idea:",
+        placeholder="Example: A young botanist discovers a glowing plant...",
+        height=320
+    )
+
+    # Generate button placed under the story text area (right column)
+    generate_button = st.button("⚡ Generate Story Outline", use_container_width=True, key="generate_button")
+
+# Outline box placeholder — will update dynamically
+if "generated_outline" not in st.session_state:
+    st.session_state["generated_outline"] = ""
+
 
 # -------------------------
 # 2. Connect to LLM API to make the og outline
@@ -70,9 +126,7 @@ def call_llm(prompt):
 # 4. Generate Visual Outline Only
 # -------------------------
 
-st.subheader("3. Generate Story Outline")
-
-if st.button("Generate Story Outline"):
+if generate_button:
     if not story_idea and not file_text:
         st.error("Please enter a story idea or upload a document.")
     else:
@@ -110,5 +164,35 @@ if st.button("Generate Story Outline"):
         with st.spinner("Generating outline..."):
             result = call_llm(prompt)
 
-        st.subheader("📘 Generated Story Outline")
-        st.markdown(result)
+        st.session_state["generated_outline"] = result
+
+# -----------------------------------------------------
+# DRAG-AND-DROP OUTLINE
+# -----------------------------------------------------
+with left_col:
+    st.subheader("📚 Visual Outline (Drag to Reorder)")
+
+    # Convert outline to list of lines
+    outline_lines = [
+        line for line in st.session_state["generated_outline"].split("\n") if line.strip()
+    ]
+
+    if outline_lines:
+        reordered = sort_items(
+            items=outline_lines,
+            direction="vertical",
+            key="sortable_outline"
+        )
+
+        # Save updated order
+        st.session_state["generated_outline"] = "\n".join(reordered)
+
+    # Editable text box for fine details
+    st.text_area(
+        "Edit Outline:",
+        value=st.session_state["generated_outline"],
+        height=320,
+        key="editable_outline"
+    )
+
+
