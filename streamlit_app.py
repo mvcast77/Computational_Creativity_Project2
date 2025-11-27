@@ -2,7 +2,6 @@ import streamlit as st
 import json
 import os
 import requests
-from streamlit_sortables import sort_items
 from datetime import datetime
 
 # -------------------------
@@ -94,7 +93,19 @@ with right_col:
     )
 
     # Generate button placed under the story text area (right column)
-    generate_button = st.button("⚡ Generate Story Outline", use_container_width=True, key="generate_button")
+    generate_button = st.button("Generate Story Outline", use_container_width=True, key="generate_button")
+
+    # Subheader and textbox for prompt to edit outline
+    st.subheader("⚡ Spice up the outline!")
+    prompt_edit_outline = st.text_area(
+        "Type here to edit outline:",
+        placeholder="E.g. Add a twist in Act II, make the ending more hopeful...",
+        height=100,
+        key="prompt_edit_outline"
+    )
+
+    # Prompt button placed under the prompt text area (right column)
+    prompt_button = st.button("Prompt the model", use_container_width=True, key="prompt_button")
 
 # Outline box placeholder — will update dynamically
 if "generated_outline" not in st.session_state:
@@ -114,7 +125,7 @@ st.info(f"Using model: {model} (best free option for creative writing).")
 # -------------------------
 
 def call_llm(prompt):
-    response = requests.get("http://0.0.0.0:8000/api/v1/methods/receive_result")
+    response = requests.get("http://127.0.0.1:8000/api/v1/methods/receive_result")
     print("Received: ")
     print(response.text)
     data = response.json()
@@ -167,10 +178,10 @@ if generate_button:
         st.session_state["generated_outline"] = result
 
 # -----------------------------------------------------
-# DRAG-AND-DROP OUTLINE
+# OUTLINE
 # -----------------------------------------------------
 with left_col:
-    st.subheader("📚 Visual Outline (Drag to Reorder)")
+    st.subheader("📚 Visual Outline")
 
     # Convert outline to list of lines
     outline_lines = [
@@ -178,21 +189,29 @@ with left_col:
     ]
 
     if outline_lines:
-        reordered = sort_items(
-            items=outline_lines,
-            direction="vertical",
-            key="sortable_outline"
+        # Limit height and add scroll bar to the entire outline box
+        st.markdown(
+            """
+            <style>
+            .st-emotion-cache-3n56ur.e1326t815 {
+                max-height: 600px !important;
+                overflow-y: auto !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
         )
 
-        # Save updated order
-        st.session_state["generated_outline"] = "\n".join(reordered)
+        with st.expander("Editable Outline", expanded=True):
+            edited_lines = []
+            for i, line in enumerate(outline_lines):
+                new_line = st.text_input(f"Item {i+1}", value=line, key=f"outline_edit_{i}")
+                edited_lines.append(new_line)
 
-    # Editable text box for fine details
-    st.text_area(
-        "Edit Outline:",
-        value=st.session_state["generated_outline"],
-        height=320,
-        key="editable_outline"
-    )
+        # Save updated outline (preserve order from edited_lines)
+        st.session_state["generated_outline"] = "\n".join(edited_lines)
+
+    else:
+        st.info("No outline generated yet. Click 'Generate Story Outline' to create one.")
 
 
