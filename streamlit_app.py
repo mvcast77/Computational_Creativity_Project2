@@ -64,7 +64,7 @@ st.info(f"Using model: {model} (best free option for creative writing).")
 # -------------------------
 
 def call_llm(prompt):
-    response = requests.get("http://127.0.0.1:8000/api/v1/methods/receive_result") #might need to change 0.0.0.0 to 127.0.0.1
+    response = requests.get("http://0.0.0.0:8000/api/v1/methods/receive_result") #might need to change 0.0.0.0 to 127.0.0.1
     print("Received: ")
     print(response.text)
     data = response.json()
