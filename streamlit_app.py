@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 import requests
+from openai import OpenAI
 from datetime import datetime
 
 # -------------------------
@@ -49,8 +50,13 @@ if uploaded_file is not None:
 # 2. Connect to LLM API to make the og outline
 # -------------------------
  
-api_key = "" #API KEY GOES HERE
-model = "" #MODEL NAME GOES HERE
+#API KEY GOES HERE
+api_key = "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" 
+#MODEL NAME GOES HERE
+model = "gpt-4o" 
+
+client = OpenAI(api_key=api_key) #might not need this line
+
 st.info(f"Using model: {model} (best free option for creative writing).")
 
 # -------------------------
@@ -58,13 +64,24 @@ st.info(f"Using model: {model} (best free option for creative writing).")
 # -------------------------
 
 def call_llm(prompt):
-    response = requests.get("http://0.0.0.0:8000/api/v1/methods/receive_result")
+    response = requests.get("http://0.0.0.0:8000/api/v1/methods/receive_result") #might need to change 0.0.0.0 to 127.0.0.1
     print("Received: ")
     print(response.text)
     data = response.json()
     return data["new_text"]
     # print("THE FUNCTION THAT CALLS THE LLM GOES HERE!")
 
+#FOR WHEN WE NO LONGER USE API RESPONSE; THIS IS FOR THE LLM CALL
+# def call_llm(prompt: str) -> str:
+#     completion = openai.chat.completions.create(
+#         model=model,
+#         messages=[
+#             {"role": "system", "content": "You are a helpful story outline assistant."},
+#             {"role": "user", "content": prompt},
+#         ],
+#         temperature=0.8,
+#     )
+#     return completion.choices[0].message.content
 
 # -------------------------
 # 4. Generate Visual Outline Only
@@ -76,10 +93,9 @@ if st.button("Generate Story Outline"):
     if not story_idea and not file_text:
         st.error("Please enter a story idea or upload a document.")
     else:
-        combined_text = story_idea + "\n\n" + file_text
+        combined_text = (story_idea or "") + "\n\n" + (file_text or "")
 
-        prompt = f"""Does this work"""
-        """
+        prompt = f"""
             Create a clear, detailed, visual story outline based on the following material:
 
             {combined_text}

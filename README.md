@@ -23,3 +23,20 @@ A simple Streamlit app template for you to modify!
    ```
    $ streamlit run streamlit_app.py
    ```
+
+----------------
+
+To test if user input can be presented into the output on the page, all you need to do is comment out in streamlit_app.py:
+
+1) All of Section 3: Function: Call LLM
+
+2) lines 108 - 109:
+
+#with st.spinner("Generating outline..."):
+        #     result = call_llm(prompt)
+
+3) And change line 112 from    st.markdown(result) --->    st.markdown(combined_text)
+
+----------------
+
+api_key = "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" 
