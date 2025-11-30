@@ -25,24 +25,13 @@ async def sandwiches():
 	return{
 		"outline_id":"num",
 		"outline_count":"num",
-		"new_text":"""# The story
-A knight and a peasant were best friends
-
-But then the peasant slept with the princess and the knight is ordered to kill his friend
-
-The Knight must go on a treacherous journey to kill his friend or put his family and himself in danger
-
-## Rising Action
-The knight finds his friend, disheveled and weak
-
-He decides against killing his best friend
-
-## The Climax
-The king hears that the knight failed to do his duty. He comes home to his family, slaughtered
-
-The knight, filled with hatred and revenge, finds his friend and kills him in front of the king
-
-## The End"""
+		"new_text":"""
+A knight and a peasant were best friends. But then the peasant slept with the princess and the knight is ordered to kill his friend.
+The Knight must go on a treacherous journey to kill his friend or put his family and himself in danger.
+The knight finds his friend, disheveled and weak. He decides against killing his best friend
+The king hears that the knight failed to do his duty. He comes home to his family, slaughtered!
+The knight, filled with hatred and revenge, finds his friend and kills him in front of the king!
+"""
 	}
 
 if __name__ == "__main__":
