@@ -51,7 +51,7 @@ if uploaded_file is not None:
 # -------------------------
  
 #API KEY GOES HERE
-api_key = "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" 
+api_key = ""
 #MODEL NAME GOES HERE
 model = "gpt-4o" 
 

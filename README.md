@@ -37,6 +37,3 @@ To test if user input can be presented into the output on the page, all you need
 
 3) And change line 112 from    st.markdown(result) --->    st.markdown(combined_text)
 
-----------------
-
-api_key = "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" 
