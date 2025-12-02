@@ -14,6 +14,8 @@ st.title("📝 Story Outline Builder")
 
 st.subheader("1. Describe Your Story Idea in the Text Box Below or Upload it")
 
+st.caption("💡 Tip: Any changes you make to the story text will automatically be included in the next LLM prompt when you generate or regenerate.")
+
 # Create two columns for story input and file upload
 col1, col2 = st.columns([2, 1])
 
@@ -124,6 +126,20 @@ if 'plot_points_per_act' not in st.session_state:
 
 st.subheader("2. Generate Story Outline")
 
+def _construct_full_outline_from_beats():
+    act1_text = "\n".join([f"- {b}" for b in st.session_state.get('act1_beats', [])])
+    act2_text = "\n".join([f"- {b}" for b in st.session_state.get('act2_beats', [])])
+    act3_text = "\n".join([f"- {b}" for b in st.session_state.get('act3_beats', [])])
+    return f"Act I - Setup\n{act1_text}\n\nAct II - Rising Action\n{act2_text}\n\nAct III - Climax & Resolution\n{act3_text}"
+
+
+def _update_version_labels():
+    # enforce label format: store just timestamp; UI will add index
+    for i, v in enumerate(st.session_state.outline_versions):
+        ts = v.get('timestamp') or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        st.session_state.outline_versions[i]['label'] = ts
+
+
 
 if st.button("Generate Complete Story Outline"):
     if not story_idea and not file_text:
@@ -163,6 +179,7 @@ if st.button("Generate Complete Story Outline"):
             """
 
         with st.spinner("Generating outline..."):
+            print(prompt)
             result = call_llm(prompt)
 
             #FOR API CALL
@@ -173,13 +190,13 @@ if st.button("Generate Complete Story Outline"):
             if st.session_state.full_outline.strip():
                 ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 st.session_state.outline_versions.append({
-                    'label': f"Full outline generation @ {ts}",
                     'timestamp': ts,
                     'outline': st.session_state.full_outline,
                     'act1_beats': st.session_state.act1_beats[:],
                     'act2_beats': st.session_state.act2_beats[:],
                     'act3_beats': st.session_state.act3_beats[:]
                 })
+                _update_version_labels()
 
             st.session_state.full_outline = result #stores outline into current session
             st.session_state.outline_generated = True #marks outline as generated
@@ -189,35 +206,33 @@ if st.button("Generate Complete Story Outline"):
                 """Extract individual beats from outline text, filtering out headers."""
                 lines = text.split('\n')
                 beats = []
-                
                 for line in lines:
                     line = line.strip()
                     # Skip empty lines
                     if not line:
                         continue
-                    
-                    # Skip structural headers (but be more specific)
+                    # Skip structural headers
                     line_lower = line.lower()
                     if line_lower in ['setup', 'rising action', 'climax', 'resolution', 'climax & resolution', 'climax and resolution']:
                         continue
                     if line.startswith('- **') and line.endswith('**'):
-                        # This is a bold header like "- **Setup**"
                         continue
-                    
                     # Extract actual beat content (remove bullet markers)
                     if line.startswith('- '):
                         beat = line[2:].strip()
                         # Remove "Key beat X:" prefix if present
                         if beat.lower().startswith('key beat'):
-                            # Find the colon and take everything after it
                             if ':' in beat:
                                 beat = beat.split(':', 1)[1].strip()
                             else:
-                                continue  # Skip if it's just "Key beat X" without content
-                        if beat:  # Only add non-empty beats
-                            beats.append(beat)
+                                continue
+                    else:
+                        beat = line
+                    if beat:
+                        beats.append(beat)
                 return beats
 
+            # Split into per-act raw text and parse into beats
             lines = result.split('\n')
             act1_text = []
             act2_text = []
@@ -227,19 +242,15 @@ if st.button("Generate Complete Story Outline"):
             for line in lines:
                 line_stripped = line.strip()
                 line_lower = line_stripped.lower()
-                
-                # Check for Act transitions - be more flexible
                 if 'act i' in line_lower and 'act ii' not in line_lower and 'act iii' not in line_lower:
                     current_act = 1
-                    continue  # Don't add the act header line itself
+                    continue
                 elif 'act ii' in line_lower and 'act iii' not in line_lower:
                     current_act = 2
-                    continue  # Don't add the act header line itself
+                    continue
                 elif 'act iii' in line_lower:
                     current_act = 3
-                    continue  # Don't add the act header line itself
-                
-                # Assign line to current act
+                    continue
                 if current_act == 1:
                     act1_text.append(line)
                 elif current_act == 2:
@@ -250,11 +261,19 @@ if st.button("Generate Complete Story Outline"):
             st.session_state.act1_beats = parse_beats('\n'.join(act1_text))
             st.session_state.act2_beats = parse_beats('\n'.join(act2_text))
             st.session_state.act3_beats = parse_beats('\n'.join(act3_text))
+            
+
+            # Cap beats to the specified number of plot points per act
+            max_beats = st.session_state.plot_points_per_act
+            st.session_state.act1_beats = st.session_state.act1_beats[:max_beats]
+            st.session_state.act2_beats = st.session_state.act2_beats[:max_beats]
+            st.session_state.act3_beats = st.session_state.act3_beats[:max_beats]
 
             # After generating, set selected_version_idx to None (current)
             st.session_state.selected_version_idx = None
 
         st.success("✅ Outline generated! You can now edit individual sections below.")
+        st.rerun()
 
 # -------------------------
 # 5. Editable Outline Sections (Linear Layout) + Version History UI
@@ -264,7 +283,7 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
     st.subheader("📘 Edit Your Story Outline")
     st.write("Edit each section independently below. Scroll down to save, download, or view previous versions.")
 
-    # Version history UI (show numeric index + label)
+    # Version history UI (show numeric index + timestamp)
     version_options = [f"{i+1}: {v.get('label', v.get('timestamp',''))}" for i, v in enumerate(st.session_state.outline_versions)]
     if st.session_state.outline_generated:
         version_options.append("Current")
@@ -284,14 +303,7 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
         except Exception:
             idx = 0
         v = st.session_state.outline_versions[idx]
-        st.info(f"Viewing version: {v.get('label', v.get('timestamp'))}. To restore, click below.")
-
-        # allow renaming the version
-        new_label = st.text_input("Rename version:", value=v.get('label',''), key=f"rename_input_{idx}")
-        if st.button("Rename", key=f"rename_btn_{idx}"):
-            st.session_state.outline_versions[idx]['label'] = new_label
-            st.success("Version renamed.")
-            st.rerun()
+        st.info(f"Viewing version {idx+1}: {v.get('label', v.get('timestamp'))}. To restore, click below.")
 
         if st.button("Restore This Version", key=f"restore_{idx}"):
             st.session_state.full_outline = v['outline']
@@ -337,6 +349,46 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
                 key=f"act1_beat_{i}",
                 label_visibility="collapsed"
             )
+        # Regenerate Act I using current story text and outline
+        if st.button("🔄 Regenerate Act I", key="regen_act1"):
+            if st.session_state.full_outline.strip():
+                ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                st.session_state.outline_versions.append({
+                    'timestamp': ts,
+                    'outline': st.session_state.full_outline,
+                    'act1_beats': st.session_state.act1_beats[:],
+                    'act2_beats': st.session_state.act2_beats[:],
+                    'act3_beats': st.session_state.act3_beats[:]
+                })
+                _update_version_labels()
+
+            current_outline_text = _construct_full_outline_from_beats()
+            combined_text = (story_idea or "") + "\n\n" + (file_text or "") + "\n\nCurrent Outline:\n" + current_outline_text
+            prompt = f"""Based on this story and the current outline: {combined_text}
+            Generate ONLY Act I - Setup section with {st.session_state.plot_points_per_act} key beats in hierarchical bullet format."""
+            with st.spinner("Regenerating Act I..."):
+                print(prompt)
+                new_text = call_llm(prompt)
+            # parse result into beats
+            def _parse_beats(text):
+                beats = []
+                for line in text.split('\n'):
+                    l = line.strip()
+                    if not l:
+                        continue
+                    if l.startswith('- '):
+                        b = l[2:].strip()
+                    else:
+                        b = l
+                    if b.lower().startswith('key beat') and ':' in b:
+                        b = b.split(':',1)[1].strip()
+                    if b:
+                        beats.append(b)
+                return beats
+            st.session_state.act1_beats = _parse_beats(new_text)
+            # Cap to specified plot points
+            st.session_state.act1_beats = st.session_state.act1_beats[:st.session_state.plot_points_per_act]
+            st.rerun()
 
     # Act II - Rising Action
     with st.expander("🎬 Act II - Rising Action", expanded=True):
@@ -348,6 +400,43 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
                 key=f"act2_beat_{i}",
                 label_visibility="collapsed"
             )
+        if st.button("🔄 Regenerate Act II", key="regen_act2"):
+            if st.session_state.full_outline.strip():
+                ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                st.session_state.outline_versions.append({
+                    'timestamp': ts,
+                    'outline': st.session_state.full_outline,
+                    'act1_beats': st.session_state.act1_beats[:],
+                    'act2_beats': st.session_state.act2_beats[:],
+                    'act3_beats': st.session_state.act3_beats[:]
+                })
+                _update_version_labels()
+
+            current_outline_text = _construct_full_outline_from_beats()
+            combined_text = (story_idea or "") + "\n\n" + (file_text or "") + "\n\nCurrent Outline:\n" + current_outline_text
+            prompt = f"""Based on this story and the current outline: {combined_text}
+            Generate ONLY Act II - Rising Action section with {st.session_state.plot_points_per_act} key beats in hierarchical bullet format."""
+            with st.spinner("Regenerating Act II..."):
+                new_text = call_llm(prompt)
+            def _parse_beats(text):
+                beats = []
+                for line in text.split('\n'):
+                    l = line.strip()
+                    if not l:
+                        continue
+                    if l.startswith('- '):
+                        b = l[2:].strip()
+                    else:
+                        b = l
+                    if b.lower().startswith('key beat') and ':' in b:
+                        b = b.split(':',1)[1].strip()
+                    if b:
+                        beats.append(b)
+                return beats
+            st.session_state.act2_beats = _parse_beats(new_text)
+            # Cap to specified plot points
+            st.session_state.act2_beats = st.session_state.act2_beats[:st.session_state.plot_points_per_act]
+            st.rerun()
 
     # Act III - Climax & Resolution
     with st.expander("🎯 Act III - Climax & Resolution", expanded=True):
@@ -359,6 +448,43 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
                 key=f"act3_beat_{i}",
                 label_visibility="collapsed"
             )
+        if st.button("🔄 Regenerate Act III", key="regen_act3"):
+            if st.session_state.full_outline.strip():
+                ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                st.session_state.outline_versions.append({
+                    'timestamp': ts,
+                    'outline': st.session_state.full_outline,
+                    'act1_beats': st.session_state.act1_beats[:],
+                    'act2_beats': st.session_state.act2_beats[:],
+                    'act3_beats': st.session_state.act3_beats[:]
+                })
+                _update_version_labels()
+
+            current_outline_text = _construct_full_outline_from_beats()
+            combined_text = (story_idea or "") + "\n\n" + (file_text or "") + "\n\nCurrent Outline:\n" + current_outline_text
+            prompt = f"""Based on this story and the current outline: {combined_text}
+            Generate ONLY Act III - Climax & Resolution section with {st.session_state.plot_points_per_act} key beats in hierarchical bullet format."""
+            with st.spinner("Regenerating Act III..."):
+                new_text = call_llm(prompt)
+            def _parse_beats(text):
+                beats = []
+                for line in text.split('\n'):
+                    l = line.strip()
+                    if not l:
+                        continue
+                    if l.startswith('- '):
+                        b = l[2:].strip()
+                    else:
+                        b = l
+                    if b.lower().startswith('key beat') and ':' in b:
+                        b = b.split(':',1)[1].strip()
+                    if b:
+                        beats.append(b)
+                return beats
+            st.session_state.act3_beats = _parse_beats(new_text)
+            # Cap to specified plot points
+            st.session_state.act3_beats = st.session_state.act3_beats[:st.session_state.plot_points_per_act]
+            st.rerun()
 
     # -------------------------
     # Regenerate Entire Outline Section
@@ -382,15 +508,16 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
             if st.session_state.full_outline.strip():
                 ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 st.session_state.outline_versions.append({
-                    'label': f"Before Regenerate Outline @ {ts}",
                     'timestamp': ts,
                     'outline': st.session_state.full_outline,
                     'act1_beats': st.session_state.act1_beats[:],
                     'act2_beats': st.session_state.act2_beats[:],
                     'act3_beats': st.session_state.act3_beats[:]
                 })
-
-            combined_text = (story_idea or "") + "\n\n" + (file_text or "")
+                _update_version_labels()
+            # include current outline and user edits in the prompt
+            current_outline_text = _construct_full_outline_from_beats()
+            combined_text = (story_idea or "") + "\n\n" + (file_text or "") + "\n\nCurrent Outline:\n" + current_outline_text
             prompt = f"""
                 Create a clear, detailed, visual story outline based on the following material:
 
