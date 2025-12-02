@@ -11,19 +11,24 @@ from datetime import datetime
 
 st.set_page_config(page_title="Story Outline Builder", page_icon="📝", layout="wide")
 st.title("📝 Story Outline Builder")
-st.write("Generate and edit story outlines using an LLM (Claude or OpenAI).")
 
 st.subheader("1. Describe Your Story Idea in the Text Box Below or Upload it")
-story_idea = st.text_area(
-    "Enter the premise or partial story description:",
-    placeholder="Example: A young botanist discovers a glowing plant in the forest...",
-    height=120
-)
 
-uploaded_file = st.file_uploader(
-    "Upload a PDF, TXT, or DOCX file: ",
-    type=["pdf", "txt", "docx"]
-)
+# Create two columns for story input and file upload
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    story_idea = st.text_area(
+        "Enter the premise or partial story description:",
+        placeholder="Example: A young botanist discovers a glowing plant in the forest...",
+        height=200
+    )
+
+with col2:
+    uploaded_file = st.file_uploader(
+        "Upload a PDF, TXT, or DOCX file:",
+        type=["pdf", "txt", "docx"]
+    )
 
 file_text = ""
 
@@ -45,6 +50,17 @@ if uploaded_file is not None:
         file_text = "\n".join([p.text for p in doc.paragraphs])
 
     st.text_area("Extracted Document Text:", value=file_text, height=200)
+
+# Plot points selection - now as a number input
+st.write("")
+plot_points_per_act = st.number_input(
+    "Number of plot points per act:",
+    min_value=2,
+    max_value=6,
+    value=3,
+    step=1,
+    help="Enter how many key beats/plot points you want for each act (2-6)"
+)
 
 # -------------------------
 # 2. Connect to LLM API to make the og outline
@@ -90,19 +106,21 @@ def call_llm(prompt: str) -> str:
 # Initialize session state for storing outline sections and version history
 if 'full_outline' not in st.session_state:
     st.session_state.full_outline = ""
-if 'act1_content' not in st.session_state:
-    st.session_state.act1_content = ""
-if 'act2_content' not in st.session_state:
-    st.session_state.act2_content = ""
-if 'act3_content' not in st.session_state:
-    st.session_state.act3_content = ""
+if 'act1_beats' not in st.session_state:
+    st.session_state.act1_beats = []
+if 'act2_beats' not in st.session_state:
+    st.session_state.act2_beats = []
+if 'act3_beats' not in st.session_state:
+    st.session_state.act3_beats = []
 if 'outline_generated' not in st.session_state:
     st.session_state.outline_generated = False
-# Version history: list of dicts with keys 'timestamp', 'outline', 'act1', 'act2', 'act3'
+# Version history: list of dicts with keys 'timestamp', 'outline', 'act1_beats', 'act2_beats', 'act3_beats'
 if 'outline_versions' not in st.session_state:
     st.session_state.outline_versions = []
 if 'selected_version_idx' not in st.session_state:
     st.session_state.selected_version_idx = None
+if 'plot_points_per_act' not in st.session_state:
+    st.session_state.plot_points_per_act = 3
 
 st.subheader("2. Generate Story Outline")
 
@@ -111,31 +129,34 @@ if st.button("Generate Complete Story Outline"):
     if not story_idea and not file_text:
         st.error("Please enter a story idea or upload a document.")
     else:
+        # Store the plot points preference
+        st.session_state.plot_points_per_act = plot_points_per_act
+        
         combined_text = (story_idea or "") + "\n\n" + (file_text or "")
+        
+        # Create example beats based on the selected number
+        example_beats = "\n".join([f"                - Key beat {i+1}" for i in range(plot_points_per_act)])
 
         prompt = f"""
             Create a clear, detailed, visual story outline based on the following material:
 
             {combined_text}
 
-            Your outline must follow this format:
+            Your outline must follow this format with EXACTLY {plot_points_per_act} plot points per act:
 
-            ### 📚 Visual Outline
             - Act I
             - Setup
-                - Key beat 1
-                - Key beat 2
+{example_beats}
             - Act II
             - Rising Action
-                - Key beat 1
-                - Key beat 2
+{example_beats}
             - Act III
             - Climax & Resolution
-                - Key beat 1
-                - Key beat 2
+{example_beats}
 
             Guidelines:
             - Use hierarchical bullet formatting.
+            - Provide EXACTLY {plot_points_per_act} key beats for each act.
             - Do NOT include a summary or explanations.
             - Keep the outline tight and structured like a screenplay or novel planner.
             - Focus purely on plot beats and story flow.
@@ -155,42 +176,80 @@ if st.button("Generate Complete Story Outline"):
                     'label': f"Full outline generation @ {ts}",
                     'timestamp': ts,
                     'outline': st.session_state.full_outline,
-                    'act1': st.session_state.act1_content,
-                    'act2': st.session_state.act2_content,
-                    'act3': st.session_state.act3_content
+                    'act1_beats': st.session_state.act1_beats[:],
+                    'act2_beats': st.session_state.act2_beats[:],
+                    'act3_beats': st.session_state.act3_beats[:]
                 })
 
             st.session_state.full_outline = result #stores outline into current session
             st.session_state.outline_generated = True #marks outline as generated
 
-            # Parse the outline into sections (simple split by Act headers)
-            # This is a basic parser - you may need to adjust based on actual LLM output
+            # Parse the outline into individual beats
+            def parse_beats(text):
+                """Extract individual beats from outline text, filtering out headers."""
+                lines = text.split('\n')
+                beats = []
+                
+                for line in lines:
+                    line = line.strip()
+                    # Skip empty lines
+                    if not line:
+                        continue
+                    
+                    # Skip structural headers (but be more specific)
+                    line_lower = line.lower()
+                    if line_lower in ['setup', 'rising action', 'climax', 'resolution', 'climax & resolution', 'climax and resolution']:
+                        continue
+                    if line.startswith('- **') and line.endswith('**'):
+                        # This is a bold header like "- **Setup**"
+                        continue
+                    
+                    # Extract actual beat content (remove bullet markers)
+                    if line.startswith('- '):
+                        beat = line[2:].strip()
+                        # Remove "Key beat X:" prefix if present
+                        if beat.lower().startswith('key beat'):
+                            # Find the colon and take everything after it
+                            if ':' in beat:
+                                beat = beat.split(':', 1)[1].strip()
+                            else:
+                                continue  # Skip if it's just "Key beat X" without content
+                        if beat:  # Only add non-empty beats
+                            beats.append(beat)
+                return beats
+
             lines = result.split('\n')
-            act1_lines = []
-            act2_lines = []
-            act3_lines = []
-            current_act = 1  # Default to Act I for content before any headers
+            act1_text = []
+            act2_text = []
+            act3_text = []
+            current_act = 0
 
             for line in lines:
-                # Check for Act transitions
-                if 'Act I' in line or 'Setup' in line:
+                line_stripped = line.strip()
+                line_lower = line_stripped.lower()
+                
+                # Check for Act transitions - be more flexible
+                if 'act i' in line_lower and 'act ii' not in line_lower and 'act iii' not in line_lower:
                     current_act = 1
-                elif 'Act II' in line or 'Rising Action' in line:
+                    continue  # Don't add the act header line itself
+                elif 'act ii' in line_lower and 'act iii' not in line_lower:
                     current_act = 2
-                elif 'Act III' in line or 'Climax' in line or 'Resolution' in line or 'End' in line:
+                    continue  # Don't add the act header line itself
+                elif 'act iii' in line_lower:
                     current_act = 3
-
+                    continue  # Don't add the act header line itself
+                
                 # Assign line to current act
                 if current_act == 1:
-                    act1_lines.append(line)
+                    act1_text.append(line)
                 elif current_act == 2:
-                    act2_lines.append(line)
+                    act2_text.append(line)
                 elif current_act == 3:
-                    act3_lines.append(line)
+                    act3_text.append(line)
 
-            st.session_state.act1_content = '\n'.join(act1_lines)
-            st.session_state.act2_content = '\n'.join(act2_lines)
-            st.session_state.act3_content = '\n'.join(act3_lines)
+            st.session_state.act1_beats = parse_beats('\n'.join(act1_text))
+            st.session_state.act2_beats = parse_beats('\n'.join(act2_text))
+            st.session_state.act3_beats = parse_beats('\n'.join(act3_text))
 
             # After generating, set selected_version_idx to None (current)
             st.session_state.selected_version_idx = None
@@ -236,21 +295,24 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
 
         if st.button("Restore This Version", key=f"restore_{idx}"):
             st.session_state.full_outline = v['outline']
-            st.session_state.act1_content = v['act1']
-            st.session_state.act2_content = v['act2']
-            st.session_state.act3_content = v['act3']
+            st.session_state.act1_beats = v.get('act1_beats', [])
+            st.session_state.act2_beats = v.get('act2_beats', [])
+            st.session_state.act3_beats = v.get('act3_beats', [])
             st.session_state.outline_generated = True
             st.session_state.selected_version_idx = None
             st.success("Restored selected version. You can now edit and save as a new version.")
             st.rerun()
 
         # Show the outline sections as read-only
-        st.markdown("#### 📖 Act I - Setup")
-        st.text_area("Edit Act I:", value=v['act1'], height=120, key=f"act1_view_{idx}", disabled=True, label_visibility="collapsed")
-        st.markdown("#### 🎬 Act II - Rising Action")
-        st.text_area("Edit Act II:", value=v['act2'], height=120, key=f"act2_view_{idx}", disabled=True, label_visibility="collapsed")
-        st.markdown("#### 🎯 Act III - Climax & Resolution")
-        st.text_area("Edit Act III:", value=v['act3'], height=120, key=f"act3_view_{idx}", disabled=True, label_visibility="collapsed")
+        with st.expander("📖 Act I - Setup", expanded=True):
+            for i, beat in enumerate(v.get('act1_beats', [])):
+                st.text_area(f"Beat {i+1}:", value=beat, height=80, key=f"act1_beat{i}_view_{idx}", disabled=True, label_visibility="collapsed")
+        with st.expander("🎬 Act II - Rising Action", expanded=True):
+            for i, beat in enumerate(v.get('act2_beats', [])):
+                st.text_area(f"Beat {i+1}:", value=beat, height=80, key=f"act2_beat{i}_view_{idx}", disabled=True, label_visibility="collapsed")
+        with st.expander("🎯 Act III - Climax & Resolution", expanded=True):
+            for i, beat in enumerate(v.get('act3_beats', [])):
+                st.text_area(f"Beat {i+1}:", value=beat, height=80, key=f"act3_beat{i}_view_{idx}", disabled=True, label_visibility="collapsed")
         st.stop()
 
     # Custom CSS to increase font size in text areas
@@ -266,111 +328,172 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
     st.write("")  # Small spacer
 
     # Act I - Setup
-    st.markdown("#### 📖 Act I - Setup")
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        st.session_state.act1_content = st.text_area(
-            "Edit Act I:",
-            value=st.session_state.act1_content,
-            height=120,
-            key="act1_editor",
-            label_visibility="collapsed"
-        )
-    with col2:
-        st.write("")  # Spacer
-        if st.button("🔄 Regenerate", key="regen_act1"):
-            # Save a version before regenerating Act I
-            if st.session_state.full_outline.strip():
-                ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                st.session_state.outline_versions.append({
-                    'label': f"Before Regenerate Act I @ {ts}",
-                    'timestamp': ts,
-                    'outline': st.session_state.full_outline,
-                    'act1': st.session_state.act1_content,
-                    'act2': st.session_state.act2_content,
-                    'act3': st.session_state.act3_content
-                })
-
-            combined_text = (story_idea or "") + "\n\n" + (file_text or "")
-            prompt = f"""Based on this story: {combined_text}
-            
-            Generate ONLY Act I - Setup section with key beats in hierarchical bullet format.
-            Focus on the setup and introduction of the story."""
-
-            with st.spinner("Regenerating Act I..."):
-                st.session_state.act1_content = call_llm(prompt)
-            st.rerun()
+    with st.expander("📖 Act I - Setup", expanded=True):
+        for i in range(len(st.session_state.act1_beats)):
+            st.session_state.act1_beats[i] = st.text_area(
+                f"Beat {i+1}:",
+                value=st.session_state.act1_beats[i],
+                height=80,
+                key=f"act1_beat_{i}",
+                label_visibility="collapsed"
+            )
 
     # Act II - Rising Action
-    st.markdown("#### 🎬 Act II - Rising Action")
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        st.session_state.act2_content = st.text_area(
-            "Edit Act II:",
-            value=st.session_state.act2_content,
-            height=120,
-            key="act2_editor",
-            label_visibility="collapsed"
-        )
-    with col2:
-        st.write("")  # Spacer
-        if st.button("🔄 Regenerate", key="regen_act2"):
-            # Save a version before regenerating Act II
-            if st.session_state.full_outline.strip():
-                ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                st.session_state.outline_versions.append({
-                    'label': f"Before Regenerate Act II @ {ts}",
-                    'timestamp': ts,
-                    'outline': st.session_state.full_outline,
-                    'act1': st.session_state.act1_content,
-                    'act2': st.session_state.act2_content,
-                    'act3': st.session_state.act3_content
-                })
-
-            combined_text = (story_idea or "") + "\n\n" + (file_text or "")
-            prompt = f"""Based on this story: {combined_text}
-            
-            Generate ONLY Act II - Rising Action section with key beats in hierarchical bullet format.
-            Focus on the rising action and conflict development."""
-
-            with st.spinner("Regenerating Act II..."):
-                st.session_state.act2_content = call_llm(prompt)
-            st.rerun()
+    with st.expander("🎬 Act II - Rising Action", expanded=True):
+        for i in range(len(st.session_state.act2_beats)):
+            st.session_state.act2_beats[i] = st.text_area(
+                f"Beat {i+1}:",
+                value=st.session_state.act2_beats[i],
+                height=80,
+                key=f"act2_beat_{i}",
+                label_visibility="collapsed"
+            )
 
     # Act III - Climax & Resolution
-    st.markdown("#### 🎯 Act III - Climax & Resolution")
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        st.session_state.act3_content = st.text_area(
-            "Edit Act III:",
-            value=st.session_state.act3_content,
-            height=120,
-            key="act3_editor",
-            label_visibility="collapsed"
-        )
-    with col2:
-        st.write("")  # Spacer
-        if st.button("🔄 Regenerate", key="regen_act3"):
-            # Save a version before regenerating Act III
+    with st.expander("🎯 Act III - Climax & Resolution", expanded=True):
+        for i in range(len(st.session_state.act3_beats)):
+            st.session_state.act3_beats[i] = st.text_area(
+                f"Beat {i+1}:",
+                value=st.session_state.act3_beats[i],
+                height=80,
+                key=f"act3_beat_{i}",
+                label_visibility="collapsed"
+            )
+
+    # -------------------------
+    # Regenerate Entire Outline Section
+    # -------------------------
+    st.divider()
+    st.markdown("### 🔄 Regenerate Entire Outline")
+    st.write("Provide specific instructions to regenerate the complete outline based on your current story idea.")
+    
+    regenerate_prompt = st.text_area(
+        "Regeneration Instructions:",
+        placeholder="Example: Make the story darker and add more mystery elements...",
+        height=100,
+        key="regenerate_prompt_input"
+    )
+    
+    if st.button("🔄 Regenerate Complete Outline", type="secondary"):
+        if not regenerate_prompt.strip():
+            st.error("Please provide instructions for regenerating the outline.")
+        else:
+            # Save a version before regenerating
             if st.session_state.full_outline.strip():
                 ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 st.session_state.outline_versions.append({
-                    'label': f"Before Regenerate Act III @ {ts}",
+                    'label': f"Before Regenerate Outline @ {ts}",
                     'timestamp': ts,
                     'outline': st.session_state.full_outline,
-                    'act1': st.session_state.act1_content,
-                    'act2': st.session_state.act2_content,
-                    'act3': st.session_state.act3_content
+                    'act1_beats': st.session_state.act1_beats[:],
+                    'act2_beats': st.session_state.act2_beats[:],
+                    'act3_beats': st.session_state.act3_beats[:]
                 })
 
             combined_text = (story_idea or "") + "\n\n" + (file_text or "")
-            prompt = f"""Based on this story: {combined_text}
-            
-            Generate ONLY Act III - Climax & Resolution section with key beats in hierarchical bullet format.
-            Focus on the climax and resolution of the story."""
+            prompt = f"""
+                Create a clear, detailed, visual story outline based on the following material:
 
-            with st.spinner("Regenerating Act III..."):
-                st.session_state.act3_content = call_llm(prompt)
+                {combined_text}
+
+                Additional instructions for this regeneration:
+                {regenerate_prompt}
+
+                Your outline must follow this format:
+
+                - Act I
+                - Setup
+                    - Key beat 1
+                    - Key beat 2
+                - Act II
+                - Rising Action
+                    - Key beat 1
+                    - Key beat 2
+                - Act III
+                - Climax & Resolution
+                    - Key beat 1
+                    - Key beat 2
+
+                Guidelines:
+                - Use hierarchical bullet formatting.
+                - Do NOT include a summary or explanations.
+                - Keep the outline tight and structured like a screenplay or novel planner.
+                - Focus purely on plot beats and story flow.
+                """
+
+            with st.spinner("Regenerating complete outline..."):
+                result = call_llm(prompt)
+                st.session_state.full_outline = result
+                
+                # Reuse the parse_beats function from the initial generation
+                def parse_beats(text):
+                    """Extract individual beats from outline text, filtering out headers."""
+                    lines = text.split('\n')
+                    beats = []
+                    
+                    for line in lines:
+                        line = line.strip()
+                        # Skip empty lines
+                        if not line:
+                            continue
+                        
+                        # Skip structural headers (but be more specific)
+                        line_lower = line.lower()
+                        if line_lower in ['setup', 'rising action', 'climax', 'resolution', 'climax & resolution', 'climax and resolution']:
+                            continue
+                        if line.startswith('- **') and line.endswith('**'):
+                            # This is a bold header like "- **Setup**"
+                            continue
+                        
+                        # Extract actual beat content (remove bullet markers)
+                        if line.startswith('- '):
+                            beat = line[2:].strip()
+                            # Remove "Key beat X:" prefix if present
+                            if beat.lower().startswith('key beat'):
+                                # Find the colon and take everything after it
+                                if ':' in beat:
+                                    beat = beat.split(':', 1)[1].strip()
+                                else:
+                                    continue  # Skip if it's just "Key beat X" without content
+                            if beat:  # Only add non-empty beats
+                                beats.append(beat)
+                    return beats
+                
+                # Parse the outline into sections
+                lines = result.split('\n')
+                act1_text = []
+                act2_text = []
+                act3_text = []
+                current_act = 0
+
+                for line in lines:
+                    line_stripped = line.strip()
+                    line_lower = line_stripped.lower()
+                    
+                    # Check for Act transitions - be more flexible
+                    if 'act i' in line_lower and 'act ii' not in line_lower and 'act iii' not in line_lower:
+                        current_act = 1
+                        continue  # Don't add the act header line itself
+                    elif 'act ii' in line_lower and 'act iii' not in line_lower:
+                        current_act = 2
+                        continue  # Don't add the act header line itself
+                    elif 'act iii' in line_lower:
+                        current_act = 3
+                        continue  # Don't add the act header line itself
+                    
+                    # Assign line to current act
+                    if current_act == 1:
+                        act1_text.append(line)
+                    elif current_act == 2:
+                        act2_text.append(line)
+                    elif current_act == 3:
+                        act3_text.append(line)
+
+                st.session_state.act1_beats = parse_beats('\n'.join(act1_text))
+                st.session_state.act2_beats = parse_beats('\n'.join(act2_text))
+                st.session_state.act3_beats = parse_beats('\n'.join(act3_text))
+                
+            st.success("✅ Outline regenerated successfully!")
             st.rerun()
 
 # -------------------------
@@ -381,20 +504,19 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
 
     with col1:
         if st.button("💾 Save Changes", type="primary"):
-            st.session_state.full_outline = f"""{st.session_state.act1_content}
-
-{st.session_state.act2_content}
-
-{st.session_state.act3_content}"""
+            # Reconstruct full outline from beats
+            act1_text = "\n".join([f"- {beat}" for beat in st.session_state.act1_beats])
+            act2_text = "\n".join([f"- {beat}" for beat in st.session_state.act2_beats])
+            act3_text = "\n".join([f"- {beat}" for beat in st.session_state.act3_beats])
+            st.session_state.full_outline = f"""Act I - Setup\n{act1_text}\n\nAct II - Rising Action\n{act2_text}\n\nAct III - Climax & Resolution\n{act3_text}"""
             st.success("✅ Changes saved to session!")
 
     with col2:
         # Download as text file
-        download_content = f"""{st.session_state.act1_content}
-
-{st.session_state.act2_content}
-
-{st.session_state.act3_content}"""
+        act1_text = "\n".join([f"- {beat}" for beat in st.session_state.act1_beats])
+        act2_text = "\n".join([f"- {beat}" for beat in st.session_state.act2_beats])
+        act3_text = "\n".join([f"- {beat}" for beat in st.session_state.act3_beats])
+        download_content = f"""Act I - Setup\n{act1_text}\n\nAct II - Rising Action\n{act2_text}\n\nAct III - Climax & Resolution\n{act3_text}"""
 
         st.download_button(
             label="📥 Download Outline",
@@ -407,7 +529,7 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
         if st.button("🗑️ Clear Outline"):
             st.session_state.outline_generated = False
             st.session_state.full_outline = ""
-            st.session_state.act1_content = ""
-            st.session_state.act2_content = ""
-            st.session_state.act3_content = ""
+            st.session_state.act1_beats = []
+            st.session_state.act2_beats = []
+            st.session_state.act3_beats = []
             st.rerun()
