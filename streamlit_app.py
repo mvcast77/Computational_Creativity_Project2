@@ -67,7 +67,7 @@ plot_points_per_act = st.number_input(
 # -------------------------
  
 #API KEY GOES HERE
-api_key = "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"
+api_key = ""
 #MODEL NAME GOES HERE
 model = "gpt-4o" 
 
