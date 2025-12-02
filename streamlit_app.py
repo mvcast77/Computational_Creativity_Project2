@@ -135,7 +135,7 @@ if st.button("Generate Complete Story Outline"):
         combined_text = (story_idea or "") + "\n\n" + (file_text or "")
         
         # Create example beats based on the selected number
-        example_beats = "\n".join([f"                - Key beat {i+1}" for i in range(plot_points_per_act)])
+        example_beats = "\n".join([f"- Key beat {i+1}" for i in range(plot_points_per_act)])
 
         prompt = f"""
             Create a clear, detailed, visual story outline based on the following material:
