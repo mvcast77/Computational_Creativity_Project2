@@ -11,7 +11,7 @@ import re
 # 1. User uploads/inputs story idea
 # -------------------------
 
-st.set_page_config(page_title="Story Outline Builder", page_icon="📝", layout="wide")
+st.set_page_config(page_title="Dynamic Outline", page_icon="📝", layout="wide")
 
 # Helper functions for document generation
 def generate_filename_from_story(story_text):
@@ -151,6 +151,10 @@ if 'dark_mode' not in st.session_state:
 
 with st.sidebar:
     st.title("⚙️ Settings")
+    
+    # Theme section
+    st.subheader("🎨 Theme")
+    
     dark_mode = st.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
     if dark_mode != st.session_state.dark_mode:
         st.session_state.dark_mode = dark_mode
@@ -209,9 +213,6 @@ with st.sidebar:
             st.download_button(
                 label="📄 Download TXT",
                 data=txt_content,
-                file_name=f"{filename_base}.txt",
-                mime="text/plain",
-                use_container_width=True
             )
 
 # Apply dark mode CSS
@@ -228,13 +229,13 @@ if st.session_state.dark_mode:
         [data-testid="stSidebar"] {
             background-color: #262730;
         }
-        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-            color: #fafafa;
+        [data-testid="stSidebar"] * {
+            color: #fafafa !important;
         }
         
-        /* Header styling */
-        header[data-testid="stHeader"] {
-            background-color: #0e1117;
+        /* Headers */
+        h1, h2, h3, h4, h5, h6 {
+            color: #fafafa !important;
         }
         
         /* Text inputs and areas */
@@ -246,15 +247,6 @@ if st.session_state.dark_mode:
             border-color: #4a4a4a;
         }
         
-        /* Labels */
-        .stTextInput > label,
-        .stTextArea > label,
-        .stNumberInput > label,
-        .stSelectbox > label,
-        .stFileUploader > label {
-            color: #fafafa !important;
-        }
-        
         /* Buttons */
         .stButton > button {
             background-color: #262730;
@@ -263,53 +255,12 @@ if st.session_state.dark_mode:
         }
         .stButton > button:hover {
             background-color: #3a3a4a;
-            border-color: #6a6a6a;
-        }
-        .stButton > button[kind="primary"] {
-            background-color: #0e4c92;
-            color: #fafafa;
-        }
-        .stButton > button[kind="primary"]:hover {
-            background-color: #1a5fa8;
         }
         
         /* Expanders */
-        .stExpander {
-            background-color: #1e1e1e;
-            border-color: #4a4a4a;
-        }
-        details[data-testid="stExpander"] summary {
+        .streamlit-expanderHeader {
             background-color: #262730;
             color: #fafafa;
-        }
-        
-        /* All text containers */
-        div[data-testid="stMarkdownContainer"],
-        div[data-testid="stMarkdownContainer"] p,
-        div[data-testid="stMarkdownContainer"] h1,
-        div[data-testid="stMarkdownContainer"] h2,
-        div[data-testid="stMarkdownContainer"] h3,
-        div[data-testid="stMarkdownContainer"] h4 {
-            color: #fafafa !important;
-        }
-        
-        /* Captions */
-        .stCaption {
-            color: #b0b0b0 !important;
-        }
-        
-        /* Info/Warning/Error boxes */
-        .stAlert {
-            background-color: #262730;
-            color: #fafafa;
-        }
-        
-        /* File uploader */
-        [data-testid="stFileUploader"] {
-            background-color: #262730;
-        }
-        [data-testid="stFileUploader"] label {
-            color: #fafafa !important;
         }
         
         /* Selectbox */
@@ -318,24 +269,37 @@ if st.session_state.dark_mode:
             color: #fafafa;
         }
         
-        /* Download button */
-        .stDownloadButton > button {
-            background-color: #262730;
-            color: #fafafa;
-            border-color: #4a4a4a;
+        /* Labels */
+        label {
+            color: #fafafa !important;
+        }
+        
+        /* Captions */
+        .stCaptionContainer {
+            color: #b0b0b0 !important;
+        }
+        
+        /* All markdown text */
+        div[data-testid="stMarkdownContainer"] p {
+            color: #fafafa !important;
         }
         </style>
     """, unsafe_allow_html=True)
-else:
-    st.markdown("""
-        <style>
-        /* Light mode styles (default) */
-        .stApp {
-            background-color: #ffffff;
-            color: #000000;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+
+# Custom CSS for generate button - cerulean color
+st.markdown("""
+    <style>
+    /* Generate button customization */
+    button[kind="primary"] {
+        background-color: #2596be !important;
+        border-color: #2596be !important;
+    }
+    button[kind="primary"]:hover {
+        background-color: #1e7a9a !important;
+        border-color: #1e7a9a !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 st.title("📝 Story Outline Builder")
 
@@ -466,7 +430,7 @@ def _update_version_labels():
 
 
 
-if st.button("🎬 Generate Complete Story Outline", type="primary", use_container_width=True):
+if st.button("🎬 Generate Complete Story Outline", type="primary"):
     if not story_idea and not file_text:
         st.error("Please enter a story idea or upload a document.")
     else:
