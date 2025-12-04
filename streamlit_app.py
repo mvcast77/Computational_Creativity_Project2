@@ -424,11 +424,14 @@ def _construct_full_outline_from_beats():
 
 def _update_version_labels():
     # enforce label format: store just timestamp; UI will add index
-    for i, v in enumerate(st.session_state.outline_versions):
-        ts = v.get('timestamp') or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        st.session_state.outline_versions[i]['label'] = ts
+	pass
+    # for i, v in enumerate(st.session_state.outline_versions):
+        # ts = v.get('timestamp') or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # st.session_state.outline_versions[i]['label'] = ts
 
-
+def _rename_version(idx, new_label):
+    """Store a human-readable label for a saved version."""
+    st.session_state.outline_versions[idx]['label'] = new_label
 
 if st.button("🎬 Generate Complete Story Outline", type="primary"):
     if not story_idea and not file_text:
@@ -479,13 +482,19 @@ if st.button("🎬 Generate Complete Story Outline", type="primary"):
             # Save current version before overwriting (if any outline exists)
             if st.session_state.full_outline.strip():
                 ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                st.session_state.outline_versions.append({
+                    # Preserve existing label if regenerating from a version that has one
+                prev_label = st.session_state.outline_versions[-1].get("label") if st.session_state.outline_versions else None
+
+                new_version = {
                     'timestamp': ts,
+					'label': ts,
                     'outline': st.session_state.full_outline,
                     'act1_beats': st.session_state.act1_beats[:],
                     'act2_beats': st.session_state.act2_beats[:],
                     'act3_beats': st.session_state.act3_beats[:]
-                })
+                }
+
+                st.session_state.outline_versions.append(new_version)
                 _update_version_labels()
 
             st.session_state.full_outline = result #stores outline into current session
@@ -600,13 +609,19 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
                 # Save a version before regenerating
                 if st.session_state.full_outline.strip():
                     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    st.session_state.outline_versions.append({
+                    # Preserve existing label if regenerating from a version that has one
+                    prev_label = st.session_state.outline_versions[-1].get("label") if st.session_state.outline_versions else None
+
+                    new_version = {
                         'timestamp': ts,
+						'label': ts,
                         'outline': st.session_state.full_outline,
                         'act1_beats': st.session_state.act1_beats[:],
                         'act2_beats': st.session_state.act2_beats[:],
                         'act3_beats': st.session_state.act3_beats[:]
-                    })
+                    }
+
+                    st.session_state.outline_versions.append(new_version)
                     _update_version_labels()
                 # include current outline and user edits in the prompt
                 current_outline_text = _construct_full_outline_from_beats()
@@ -742,6 +757,17 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
         v = st.session_state.outline_versions[idx]
         st.info(f"Viewing version {idx+1}: {v.get('label', v.get('timestamp'))}. To restore, click below.")
 
+        st.markdown("**Rename This Version**")
+        new_label = st.text_input(
+            "New name:",
+            value=v.get("label", v.get("timestamp", "")),
+            key=f"rename_input_{idx}"
+        )
+        if st.button("Save Name", key=f"rename_btn_{idx}"):
+            _rename_version(idx, new_label.strip())
+            st.success("Name updated.")
+            st.rerun()
+
         if st.button("Restore This Version", key=f"restore_{idx}"):
             st.session_state.full_outline = v['outline']
             st.session_state.act1_beats = v.get('act1_beats', [])
@@ -789,13 +815,19 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
             if st.button("🔄 Regenerate Act I", key="regen_act1"):
                 if st.session_state.full_outline.strip():
                     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    st.session_state.outline_versions.append({
+                    # Preserve existing label if regenerating from a version that has one
+                    prev_label = st.session_state.outline_versions[-1].get("label") if st.session_state.outline_versions else None
+
+                    new_version = {
                         'timestamp': ts,
+						'label': ts,
                         'outline': st.session_state.full_outline,
                         'act1_beats': st.session_state.act1_beats[:],
                         'act2_beats': st.session_state.act2_beats[:],
                         'act3_beats': st.session_state.act3_beats[:]
-                    })
+                    }
+
+                    st.session_state.outline_versions.append(new_version)
                     _update_version_labels()
 
                 current_outline_text = _construct_full_outline_from_beats()
@@ -838,13 +870,19 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
             if st.button("🔄 Regenerate Act II", key="regen_act2"):
                 if st.session_state.full_outline.strip():
                     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    st.session_state.outline_versions.append({
+                    # Preserve existing label if regenerating from a version that has one
+                    prev_label = st.session_state.outline_versions[-1].get("label") if st.session_state.outline_versions else None
+
+                    new_version = {
                         'timestamp': ts,
+						'label': ts,
                         'outline': st.session_state.full_outline,
                         'act1_beats': st.session_state.act1_beats[:],
                         'act2_beats': st.session_state.act2_beats[:],
                         'act3_beats': st.session_state.act3_beats[:]
-                    })
+                    }
+
+                    st.session_state.outline_versions.append(new_version)
                     _update_version_labels()
 
                 current_outline_text = _construct_full_outline_from_beats()
@@ -887,13 +925,19 @@ if st.session_state.outline_generated or st.session_state.outline_versions:
             if st.button("🔄 Regenerate Act III", key="regen_act3"):
                 if st.session_state.full_outline.strip():
                     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    st.session_state.outline_versions.append({
+                    # Preserve existing label if regenerating from a version that has one
+                    prev_label = st.session_state.outline_versions[-1].get("label") if st.session_state.outline_versions else None
+
+                    new_version = {
                         'timestamp': ts,
+						'label': ts,
                         'outline': st.session_state.full_outline,
                         'act1_beats': st.session_state.act1_beats[:],
                         'act2_beats': st.session_state.act2_beats[:],
                         'act3_beats': st.session_state.act3_beats[:]
-                    })
+                    }
+
+                    st.session_state.outline_versions.append(new_version)
                     _update_version_labels()
 
                 current_outline_text = _construct_full_outline_from_beats()
