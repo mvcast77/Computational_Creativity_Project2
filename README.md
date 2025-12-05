@@ -1,6 +1,10 @@
-# 🎈 Blank app template
+# 🎈 Dynamic Outline
 
-A simple Streamlit app template for you to modify!
+Features:
+Generating an outline given story text,
+Editable outline,
+Version History,
+Regenerating specific parts of the 3-part story act structure
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://blank-app-template.streamlit.app/)
 
@@ -14,9 +18,9 @@ A simple Streamlit app template for you to modify!
 
 2. Run the test server (to be replaced by a Large Language Model)
 
-    ```
-    $ python api.py
-    ```
+   ```
+   $ python api.py
+   ```
 
 3. In another window, run the app
 
@@ -24,16 +28,6 @@ A simple Streamlit app template for you to modify!
    $ streamlit run streamlit_app.py
    ```
 
-----------------
+---
 
-To test if user input can be presented into the output on the page, all you need to do is comment out in streamlit_app.py:
-
-1) All of Section 3: Function: Call LLM
-
-2) lines 108 - 109:
-
-#with st.spinner("Generating outline..."):
-        #     result = call_llm(prompt)
-
-3) And change line 112 from    st.markdown(result) --->    st.markdown(combined_text)
-
+To test if user input can be presented into the output on the page, make sure to input an OpenAI API key for 'api_key'.
